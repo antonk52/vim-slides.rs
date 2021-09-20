@@ -26,16 +26,16 @@ impl Slide {
 }
 
 fn split_to_slides(contents: &str) -> Vec<Slide> {
-    let lines: Vec<&str> = contents.split_terminator("\n").collect();
+    let lines: Vec<&str> = contents.split_terminator('\n').collect();
     let mut slides: Vec<Slide> = vec![];
     let mut current_slide = Slide::new();
 
     for line in lines {
         let trimmed = line.trim();
 
-        if trimmed.starts_with("#") {
+        if trimmed.starts_with('#') {
 
-            if current_slide.title.len() > 0 || current_slide.content.len() > 0 {
+            if !current_slide.title.is_empty() || !current_slide.content.is_empty() {
                 slides.push(current_slide);
 
                 // reset "current_slide" value
@@ -44,25 +44,23 @@ fn split_to_slides(contents: &str) -> Vec<Slide> {
 
             current_slide.title = trimmed.to_owned();
 
-        } else if trimmed.starts_with("<!--") {
+        } else if let Some(uncomment_line) = trimmed.strip_prefix("<!--") {
             // TODO support multiline comments
-            let mut uncomment_line = &trimmed[4..];
 
-            if uncomment_line.ends_with("-->") {
-                uncomment_line = &uncomment_line[0..uncomment_line.len() - 3];
-            }
-
-            current_slide.comments.push(uncomment_line.to_owned());
+            match uncomment_line.strip_suffix("-->") {
+                Some(comment_body) => current_slide.comments.push(comment_body.trim().to_owned()),
+                None => current_slide.comments.push(uncomment_line.trim().to_owned()),
+            };
         } else {
-            current_slide.content.push(trimmed.to_owned())
+            current_slide.content.push(trimmed.to_owned());
         }
     }
 
-    if current_slide.title.len() > 0 {
+    if !current_slide.title.is_empty() {
         slides.push(current_slide);
     }
 
-    return slides;
+    slides
 }
 
 pub struct VimSlidesArgs {
@@ -129,7 +127,7 @@ fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::
         println!("navigate between slides with :next and :prev\n");
     }
 
-    return Ok(());
+    Ok(())
 }
 
 fn main() -> std::io::Result<()> {
