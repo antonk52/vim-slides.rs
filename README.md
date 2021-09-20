@@ -53,3 +53,11 @@ more text
 
 references
 ```
+
+### Watch mode
+
+Alternately you can supply `--watch` flag to monitor for file changes and rebuild slides.
+
+```sh
+vim-slides --watch ./source.md ./slides/destination
+```

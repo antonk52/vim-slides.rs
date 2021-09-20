@@ -3,7 +3,11 @@ use std::fs;
 use std::path::Path;
 use std::vec;
 use std::process;
+use std::sync::mpsc::channel;
+use std::time::Duration;
 use pad::{Alignment, PadStr};
+use clap::{Arg,App};
+use notify::{Watcher, RecursiveMode, watcher};
 
 pub struct Slide {
     pub title: String,
@@ -66,47 +70,31 @@ pub struct VimSlidesArgs {
     pub destination: String,
 }
 
-fn parse_args(raw_args: Vec<String>) -> VimSlidesArgs {
-    println!("args: {}", raw_args.join(" | "));
-
-    let args_len = raw_args.iter().len();
-
-    match args_len {
-        0 | 1 => panic!("no arguments provided"),
-        2 => VimSlidesArgs {
-            source_file: raw_args[1].clone(),
-            destination: String::from("./slides"),
-        },
-        _ => VimSlidesArgs {
-            source_file: raw_args[1].clone(),
-            destination: raw_args[2].clone(),
-        }
-    }
-}
-
-fn main() -> std::io::Result<()> {
-    let args = parse_args(env::args().collect());
-
-    let contents = fs::read_to_string(args.source_file)
+fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::Result<()> {
+    let contents = fs::read_to_string(source)
         .expect("Something went wrong reading the source file");
 
     let slides = split_to_slides(contents.as_str());
 
-    let dest_path = Path::new(&args.destination);
+    let dest_path = Path::new(dest);
     if dest_path.exists() {
         if !dest_path.is_dir() {
             eprintln!("Destination exists, but it is a file, not a directory");
             process::exit(1);
         } else {
             // TODO erase dir contents, prompt user?
-            println!("Destination dir already exists");
+            if verbose {
+                println!("Destination dir already exists");
+            }
         }
     } else {
         fs::create_dir(dest_path)?;
-        println!("Created directory: {}", args.destination);
+        println!("Created directory: {}", dest);
     }
 
-    println!("slides qty {}", slides.len());
+    if verbose {
+        println!("slides qty {}", slides.len());
+    }
 
     for (i, slide) in slides.iter().enumerate() {
         let pad_char = "0".chars().next().unwrap();
@@ -137,7 +125,60 @@ fn main() -> std::io::Result<()> {
         .expect("* is a string");
 
     println!("Done, to open slides run: {} {}", editor, slides_glob);
-    println!("navigate between slides with :next and :prev");
+    if verbose {
+        println!("navigate between slides with :next and :prev\n");
+    }
+
+    return Ok(());
+}
+
+fn main() -> std::io::Result<()> {
+    let matches = App::new("vim-slides")
+        .version("1.0.0")
+        .author("Anton Kastritskiy")
+        .about("Generates markdown slides for a vim presentation")
+        .arg(
+            Arg::with_name("source")
+                .help("source markdown file")
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("destination")
+                .help("path to where the slides go")
+                .takes_value(true)
+                .required(false)
+                .default_value("./slides"),
+        )
+        .arg(
+            Arg::with_name("watch")
+                    .help("watch for file changes in the SOURCE file")
+                    .short("w")
+                    .long("watch"),
+        )
+        .get_matches();
+
+    let dest_path_str = matches.value_of("destination").unwrap();
+
+    let source_filepath = matches.value_of("source").unwrap();
+
+    create_slides_from_path(source_filepath, dest_path_str, true)?;
+
+    if matches.is_present("watch") {
+        let (tx, rx) = channel();
+        let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
+        watcher.watch(source_filepath, RecursiveMode::Recursive).unwrap();
+
+        println!("Waiting for changes for: {}", source_filepath);
+
+        loop {
+            match rx.recv() {
+                Ok(_) => {
+                    create_slides_from_path(source_filepath, dest_path_str, false)?;
+                },
+                Err(e) => println!("watch error: {:?}", e),
+            }
+        }
+    }
 
     Ok(())
 }
