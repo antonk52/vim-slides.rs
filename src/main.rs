@@ -1,13 +1,13 @@
+use clap::{App, Arg};
+use notify::{watcher, RecursiveMode, Watcher};
+use pad::{Alignment, PadStr};
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::vec;
 use std::process;
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use pad::{Alignment, PadStr};
-use clap::{Arg,App};
-use notify::{Watcher, RecursiveMode, watcher};
+use std::vec;
 
 pub struct Slide {
     pub title: String,
@@ -20,7 +20,7 @@ impl Slide {
         Slide {
             title: "".to_owned(),
             content: vec![],
-            comments: vec![]
+            comments: vec![],
         }
     }
 }
@@ -34,7 +34,6 @@ fn split_to_slides(contents: &str) -> Vec<Slide> {
         let trimmed = line.trim();
 
         if trimmed.starts_with('#') {
-
             if !current_slide.title.is_empty() || !current_slide.content.is_empty() {
                 slides.push(current_slide);
 
@@ -43,13 +42,14 @@ fn split_to_slides(contents: &str) -> Vec<Slide> {
             }
 
             current_slide.title = trimmed.to_owned();
-
         } else if let Some(uncomment_line) = trimmed.strip_prefix("<!--") {
             // TODO support multiline comments
 
             match uncomment_line.strip_suffix("-->") {
                 Some(comment_body) => current_slide.comments.push(comment_body.trim().to_owned()),
-                None => current_slide.comments.push(uncomment_line.trim().to_owned()),
+                None => current_slide
+                    .comments
+                    .push(uncomment_line.trim().to_owned()),
             };
         } else {
             current_slide.content.push(trimmed.to_owned());
@@ -69,8 +69,8 @@ pub struct VimSlidesArgs {
 }
 
 fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::Result<()> {
-    let contents = fs::read_to_string(source)
-        .expect("Something went wrong reading the source file");
+    let contents =
+        fs::read_to_string(source).expect("Something went wrong reading the source file");
 
     let slides = split_to_slides(contents.as_str());
 
@@ -98,12 +98,7 @@ fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::
         let pad_char = "0".chars().next().unwrap();
         let slide_id = format!("{}", i + 1)
             .to_string()
-            .pad(
-                3,
-                pad_char,
-                Alignment::Right,
-                true
-            );
+            .pad(3, pad_char, Alignment::Right, true);
         let slide_filepath = dest_path.join(format!("{}.md", slide_id));
 
         let lines = slide.content.join("\n");
@@ -149,9 +144,9 @@ fn main() -> std::io::Result<()> {
         )
         .arg(
             Arg::with_name("watch")
-                    .help("watch for file changes in the SOURCE file")
-                    .short("w")
-                    .long("watch"),
+                .help("watch for file changes in the SOURCE file")
+                .short("w")
+                .long("watch"),
         )
         .get_matches();
 
@@ -164,7 +159,9 @@ fn main() -> std::io::Result<()> {
     if matches.is_present("watch") {
         let (tx, rx) = channel();
         let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
-        watcher.watch(source_filepath, RecursiveMode::Recursive).unwrap();
+        watcher
+            .watch(source_filepath, RecursiveMode::Recursive)
+            .unwrap();
 
         println!("Waiting for changes for: {}", source_filepath);
 
@@ -172,7 +169,7 @@ fn main() -> std::io::Result<()> {
             match rx.recv() {
                 Ok(_) => {
                     create_slides_from_path(source_filepath, dest_path_str, false)?;
-                },
+                }
                 Err(e) => println!("watch error: {:?}", e),
             }
         }
