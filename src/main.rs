@@ -126,10 +126,8 @@ fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::
         fs::write(slide_filepath, slide_content.trim()).expect("Could not write file for a slide");
     }
 
-    let editor: String = match env::var("EDITOR") {
-        Ok(x) => x,
-        Err(_) => String::from("vi"),
-    };
+    let editor: String = env::var("EDITOR").unwrap_or_else(|_| String::from("vi"));
+
     let slides_glob = dest_path
         .join("*")
         .into_os_string()
