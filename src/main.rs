@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use clap::{App, Arg};
 use notify::{watcher, RecursiveMode, Watcher};
 use pad::{Alignment, PadStr};
@@ -23,6 +24,23 @@ impl Slide {
             comments: vec![],
         }
     }
+}
+
+fn pad_num(width: usize, arg: u32) -> String {
+    let s = format!("{}", arg);
+
+    s.pad(width, '0', Alignment::Right, true)
+}
+
+fn timestamp() -> String {
+    let local = Local::now();
+
+    return format!(
+        "[{}:{}:{}]",
+        pad_num(2, local.hour()),
+        pad_num(2, local.minute()),
+        pad_num(2, local.second()),
+    );
 }
 
 fn split_to_slides(contents: &str) -> Vec<Slide> {
@@ -97,10 +115,9 @@ fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::
     }
 
     for (i, slide) in slides.iter().enumerate() {
-        let pad_char = "0".chars().next().unwrap();
         let slide_id = format!("{}", i + 1)
             .to_string()
-            .pad(3, pad_char, Alignment::Right, true);
+            .pad(3, '0', Alignment::Right, true);
         let slide_filepath = dest_path.join(format!("{}.md", slide_id));
 
         let lines = slide.content.join("\n");
@@ -119,9 +136,15 @@ fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::
         .into_string()
         .expect("* is a string");
 
-    println!("Done, to open slides run: {} {}", editor, slides_glob);
+    println!(
+        "{} Done, to open slides run: {} {}",
+        timestamp(),
+        editor,
+        slides_glob
+    );
+
     if verbose {
-        println!("navigate between slides with :next and :prev\n");
+        println!("navigate between slides with :next and :prev");
     }
 
     Ok(())
