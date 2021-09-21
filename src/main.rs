@@ -30,10 +30,11 @@ fn split_to_slides(contents: &str) -> Vec<Slide> {
     let mut slides: Vec<Slide> = vec![];
     let mut current_slide = Slide::new();
 
-    for line in lines {
-        let trimmed = line.trim();
+    for raw_line in lines {
+        let line = raw_line.trim_end();
+        let trimmed = line.trim_start();
 
-        if trimmed.starts_with('#') {
+        if line.trim_start().starts_with('#') {
             if !current_slide.title.is_empty() || !current_slide.content.is_empty() {
                 slides.push(current_slide);
 
@@ -52,7 +53,8 @@ fn split_to_slides(contents: &str) -> Vec<Slide> {
                     .push(uncomment_line.trim().to_owned()),
             };
         } else {
-            current_slide.content.push(trimmed.to_owned());
+            // preserve original content indentation
+            current_slide.content.push(line.to_owned());
         }
     }
 
