@@ -13,7 +13,7 @@ use std::vec;
 pub struct Slide {
     pub title: String,
     pub content: Vec<String>,
-    pub comments: Vec<String>,
+    pub notes: Vec<String>,
 }
 
 impl Slide {
@@ -21,7 +21,7 @@ impl Slide {
         Slide {
             title: "".to_owned(),
             content: vec![],
-            comments: vec![],
+            notes: vec![],
         }
     }
 }
@@ -65,10 +65,8 @@ fn split_to_slides(contents: &str) -> Vec<Slide> {
             // TODO support multiline comments
 
             match uncomment_line.strip_suffix("-->") {
-                Some(comment_body) => current_slide.comments.push(comment_body.trim().to_owned()),
-                None => current_slide
-                    .comments
-                    .push(uncomment_line.trim().to_owned()),
+                Some(comment_body) => current_slide.notes.push(comment_body.trim().to_owned()),
+                None => current_slide.notes.push(uncomment_line.trim().to_owned()),
             };
         } else {
             // preserve original content indentation
@@ -83,12 +81,12 @@ fn split_to_slides(contents: &str) -> Vec<Slide> {
     slides
 }
 
-pub struct VimSlidesArgs {
-    pub source_file: String,
-    pub destination: String,
-}
-
-fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::Result<()> {
+fn create_slides_from_path(
+    source: &str,
+    dest: &str,
+    notes_path: Option<&str>,
+    verbose: bool,
+) -> std::io::Result<()> {
     let contents =
         fs::read_to_string(source).expect("Something went wrong reading the source file");
 
@@ -124,6 +122,32 @@ fn create_slides_from_path(source: &str, dest: &str, verbose: bool) -> std::io::
         let slide_content = format!("{}\n{}", slide.title, lines);
 
         fs::write(slide_filepath, slide_content.trim()).expect("Could not write file for a slide");
+    }
+
+    if let Some(notes_path) = notes_path {
+        let notes_title = "# Speaker notes".to_string();
+        let empty_line = "".to_string();
+        let mut notes_lines: Vec<String> = vec![notes_title, empty_line.clone()];
+        for (i, slide) in slides.iter().enumerate() {
+            let title = format!("{}(slide {})", slide.title, i + 1);
+
+            notes_lines.push(title);
+            notes_lines.push(empty_line.clone());
+
+            if !slide.notes.is_empty() {
+                for note in slide.notes.iter() {
+                    notes_lines.push(note.to_string());
+                    notes_lines.push(empty_line.clone());
+                }
+            } else {
+                notes_lines.push("empty".to_string());
+            }
+            notes_lines.push(empty_line.clone());
+        }
+
+        let notes_content = notes_lines.join("\n");
+
+        fs::write(notes_path, notes_content)?;
     }
 
     let editor: String = env::var("EDITOR").unwrap_or_else(|_| String::from("vi"));
@@ -171,13 +195,22 @@ fn main() -> std::io::Result<()> {
                 .short("w")
                 .long("watch"),
         )
+        .arg(
+            Arg::with_name("notes")
+                .help("path to a file to store speaker notes")
+                .takes_value(true)
+                .required(false)
+                .long("notes"),
+        )
         .get_matches();
 
     let dest_path_str = matches.value_of("destination").unwrap();
 
     let source_filepath = matches.value_of("source").unwrap();
 
-    create_slides_from_path(source_filepath, dest_path_str, true)?;
+    let comments_path = matches.value_of("notes");
+
+    create_slides_from_path(source_filepath, dest_path_str, comments_path, true)?;
 
     if matches.is_present("watch") {
         let (tx, rx) = channel();
@@ -191,7 +224,7 @@ fn main() -> std::io::Result<()> {
         loop {
             match rx.recv() {
                 Ok(_) => {
-                    create_slides_from_path(source_filepath, dest_path_str, false)?;
+                    create_slides_from_path(source_filepath, dest_path_str, comments_path, false)?;
                 }
                 Err(e) => println!("watch error: {:?}", e),
             }

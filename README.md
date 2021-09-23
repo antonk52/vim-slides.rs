@@ -19,9 +19,13 @@ Where the `./source.md` has following content
 
 text
 
+<!-- speaker note 1 -->
+
 ## Secondary slide
 
 more text
+
+<!-- speaker note 2 -->
 
 ## Outro slide
 
@@ -60,4 +64,30 @@ Alternately you can supply `--watch` flag to monitor for file changes and rebuil
 
 ```sh
 vim-slides --watch ./source.md ./slides/destination
+```
+
+### Speaker notes
+
+To preserve speaker notes from the slides(written in html comments) pass `--notes` flag with a path to where the notes should be saved
+
+```sh
+vim-slides --notes ./notes.md ./source.md ./slides/destination
+```
+
+Notes in `./notes.md`
+
+```md
+# Speaker notes
+
+# Title slide
+
+speaker note 1
+
+## Secondary slide
+
+speaker note 2
+
+## Outro slide
+
+empty
 ```
